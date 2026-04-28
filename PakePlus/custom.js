@@ -11,9 +11,6 @@ window.addEventListener("DOMContentLoaded",()=>{const t=document.createElement("
 
 (function () {
     'use strict';
-    // 【关键修复】环境检测：非浏览器环境直接退出，避免window未定义报错
-    if (typeof window === 'undefined') return;
-
     console.log('🚀 [PakePlus] 增强脚本启动中...');
 
     // ==============================================
@@ -105,7 +102,7 @@ window.addEventListener("DOMContentLoaded",()=>{const t=document.createElement("
         };
 
         // 缓存 XHR 请求
-        const originalXHROpen = XMLHttpRequest.prototype.open;
+        const originalXHR = XMLHttpRequest.prototype.open;
         XMLHttpRequest.prototype.open = function (...args) {
             const method = args[0];
             const url = args[1];
@@ -119,29 +116,25 @@ window.addEventListener("DOMContentLoaded",()=>{const t=document.createElement("
                     console.log('⚡ [PakePlus] 缓存命中:', url);
                     this.addEventListener('readystatechange', () => {
                         if (this.readyState === 4) {
-                            Object.defineProperty(this, 'responseText', { value: cached, configurable: true });
+                            Object.defineProperty(this, 'responseText', { value: cached });
                         }
                     });
                 }
             }
-            return originalXHROpen.apply(this, args);
+            return originalXHR.apply(this, args);
         };
 
-        // 【关键修复】修复XHR send重写的递归bug，正确保存原始方法
-        const originalXHRSend = XMLHttpRequest.prototype.send;
+        // XHR 请求完成后写入缓存
         XMLHttpRequest.prototype.send = function (...args) {
             this.addEventListener('load', () => {
                 if (this.status === 200 && this._url) {
                     const cacheKey = `${CACHE_PREFIX}_${this._url}`;
-                    try {
-                        localStorage.setItem(cacheKey, this.responseText);
-                    } catch (e) {
-                        console.warn('❌ [PakePlus] XHR缓存失败:', e);
-                    }
+                    localStorage.setItem(cacheKey, this.responseText);
                 }
             });
-            return originalXHRSend.apply(this, args);
+            return XMLHttpRequest.prototype.send.original.apply(this, args);
         };
+        XMLHttpRequest.prototype.send.original = XMLHttpRequest.prototype.send;
 
         console.log('✅ [PakePlus] 请求缓存已开启');
     }
